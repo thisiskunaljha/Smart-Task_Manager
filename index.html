@@ -278,7 +278,7 @@
       renderTasks();
     }
 
-
+    function syncCloud(save) {
       const key = 'cloud_tasks_' + currentUser;
       if (save) {
         localStorage.setItem(key, JSON.stringify(tasks));
