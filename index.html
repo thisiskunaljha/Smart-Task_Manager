@@ -11,6 +11,8 @@
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%236c63ff' width='180' height='180'/><text y='135' font-size='120' text-anchor='middle' x='90' fill='white'>📝</text></svg>" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>" />
   <link rel="manifest" href="manifest.json" />
+  <meta name="google-signin-client_id" content="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <title>Smart Task Manager</title>
   <style>
     :root {
@@ -58,6 +60,8 @@
     .task-actions span { cursor: pointer; color: #ff4d4d; font-weight: bold; }
     .task-actions button { background: #999; padding: 5px 8px; font-size: .8rem; }
     .hidden { display: none; }
+    .google-btn-container { margin: 10px 0; text-align: center; }
+    #google-signin-btn { width: 100% !important; }
   </style>
   <style>
     @media (max-width: 768px) {
@@ -84,6 +88,14 @@
         <input id="password" type="password" placeholder="Password" />
         <button id="login-btn">Login</button>
         <button id="signup-btn" style="background:#2ecc71;">Signup</button>
+        <div style="display: flex; align-items: center; margin: 10px 0;">
+          <hr style="flex: 1; border: none; border-top: 1px solid #ccc;">
+          <span style="margin: 0 10px; color: #999; font-size: .9rem;">Or</span>
+          <hr style="flex: 1; border: none; border-top: 1px solid #ccc;">
+        </div>
+        <div class="google-btn-container">
+          <div id="google-signin-btn"></div>
+        </div>
         <p id="auth-msg" style="color:#d33;margin-top:8px;"></p>
       </div>
       <div class="box status-bar hidden" id="user-panel">
@@ -198,6 +210,38 @@
       userPanel.classList.add('hidden');
       authPanel.classList.remove('hidden');
       setStatus('Logged out');
+    }
+
+    function handleGoogleSignIn(response) {
+      const token = response.credential;
+      try {
+        // Decode JWT token (basic decoding - in production, verify on backend)
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const decoded = JSON.parse(jsonPayload);
+        const googleUser = decoded.email.split('@')[0]; // Use email prefix as username
+        currentUser = 'google_' + googleUser;
+        localStorage.setItem('currentUser', currentUser);
+        // Store Google-authenticated user
+        const users = loadUsers();
+        if (!users[currentUser]) {
+          users[currentUser] = { password: 'google_auth', googleId: decoded.sub };
+          saveUsers(users);
+        }
+        authMsg.textContent = '';
+        showTodoPanel();
+        setStatus('Logged in with Google', false);
+      } catch (err) {
+        setStatus('Google login failed', true);
+        console.error('Google login error:', err);
+      }
+    }
+
+    function handleGoogleSignInError() {
+      setStatus('Google login failed', true);
     }
 
     function updateStatusBar() {
@@ -327,6 +371,18 @@
         navigator.serviceWorker.register('sw.js')
           .then(reg => console.log('SW registered'))
           .catch(err => console.log('SW registration failed'));
+      }
+      // Initialize Google Sign-In
+      if (window.google) {
+        google.accounts.id.initialize({
+          client_id: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+          callback: handleGoogleSignIn,
+          auto_select: false
+        });
+        google.accounts.id.renderButton(
+          document.getElementById('google-signin-btn'),
+          { theme: 'outline', size: 'large', width: '100%' }
+        );
       }
     });
 
